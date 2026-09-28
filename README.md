@@ -2,17 +2,17 @@
 
 Frontend de la aplicación NutriGO - Sistema de seguimiento nutricional personalizado.
 
-## 🌳 Estructura de Ramas
+## Estructura de Ramas
 
 Este repositorio implementa un flujo de trabajo Git con tres ramas principales:
 
-### 📋 Ramas
+### Ramas
 
 - **`desarrollo`**: Rama de desarrollo activo donde se integran todas las nuevas funcionalidades
 - **`preproduccion`**: Rama de pruebas pre-producción para validación final antes de desplegar
 - **`produccion`**: Rama de producción que contiene el código estable desplegado
 
-### 🔄 Flujo de Trabajo
+### Flujo de Trabajo
 
 ```
 desarrollo → preproduccion → produccion
@@ -22,20 +22,20 @@ desarrollo → preproduccion → produccion
 2. Cuando una versión está lista, se fusiona a `preproduccion` para testing
 3. Después de validar en preproducción, se fusiona a `produccion` para despliegue
 
-## 🚀 Tecnologías
+## Tecnologías
 
 - **Angular** v18.2.21
 - **TypeScript**
 - **Keycloak** para autenticación
 - **RxJS** para manejo reactivo de datos
 
-## 📦 Instalación
+## Instalación
 
 ```bash
 npm install
 ```
 
-## 🛠️ Desarrollo
+## Desarrollo
 
 Ejecutar servidor de desarrollo:
 
@@ -45,7 +45,7 @@ ng serve
 
 Navegar a `http://localhost:4200/`
 
-## 🏗️ Build
+## Build
 
 ```bash
 ng build
@@ -53,7 +53,7 @@ ng build
 
 Los artefactos se almacenarán en el directorio `dist/`
 
-## 👨‍💻 Autor
+## Autor
 
 **Julian Villamizar**
 - Email: julian.villamizar200@gmail.com
