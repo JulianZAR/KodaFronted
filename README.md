@@ -1,27 +1,64 @@
-# NutrigoFrontend
+# NutriGO Frontend
 
-This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 18.2.21.
+Frontend de la aplicación NutriGO - Sistema de seguimiento nutricional personalizado.
 
-## Development server
+## 🌳 Estructura de Ramas
 
-Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The application will automatically reload if you change any of the source files.
+Este repositorio implementa un flujo de trabajo Git con tres ramas principales:
 
-## Code scaffolding
+### 📋 Ramas
 
-Run `ng generate component component-name` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module`.
+- **`desarrollo`**: Rama de desarrollo activo donde se integran todas las nuevas funcionalidades
+- **`preproduccion`**: Rama de pruebas pre-producción para validación final antes de desplegar
+- **`produccion`**: Rama de producción que contiene el código estable desplegado
 
-## Build
+### 🔄 Flujo de Trabajo
 
-Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory.
+```
+desarrollo → preproduccion → produccion
+```
 
-## Running unit tests
+1. Los desarrolladores trabajan en `desarrollo`
+2. Cuando una versión está lista, se fusiona a `preproduccion` para testing
+3. Después de validar en preproducción, se fusiona a `produccion` para despliegue
 
-Run `ng test` to execute the unit tests via [Karma](https://karma-runner.github.io).
+## 🚀 Tecnologías
 
-## Running end-to-end tests
+- **Angular** v18.2.21
+- **TypeScript**
+- **Keycloak** para autenticación
+- **RxJS** para manejo reactivo de datos
 
-Run `ng e2e` to execute the end-to-end tests via a platform of your choice. To use this command, you need to first add a package that implements end-to-end testing capabilities.
+## 📦 Instalación
 
-## Further help
+```bash
+npm install
+```
 
-To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+## 🛠️ Desarrollo
+
+Ejecutar servidor de desarrollo:
+
+```bash
+ng serve
+```
+
+Navegar a `http://localhost:4200/`
+
+## 🏗️ Build
+
+```bash
+ng build
+```
+
+Los artefactos se almacenarán en el directorio `dist/`
+
+## 👨‍💻 Autor
+
+**Julian Villamizar**
+- Email: julian.villamizar200@gmail.com
+- GitHub: [@JulianZAR](https://github.com/JulianZAR)
+
+## 📝 Licencia
+
+Proyecto académico - Universidad
