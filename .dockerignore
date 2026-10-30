@@ -1,0 +1,27 @@
+# Dependencias - se instalan dentro del contenedor
+node_modules/
+
+# Archivos de build local
+dist/
+.angular/
+
+# Git y control de versiones
+.git/
+.gitignore
+
+# Archivos de IDE y editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Archivos de SO
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Tests (no necesarios en produccion)
+karma.conf.js

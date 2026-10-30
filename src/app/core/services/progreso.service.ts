@@ -19,12 +19,12 @@ export class ProgresoService {
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.apiUrl}/api/progress`;
 
-  /** POST /api/progress — register a new weight and calculate IMC. */
+  /** POST /api/progress — register a new weight record and calculate its IMC */
   registrar(data: RegistrarProgresoRequest): Observable<ProgresoResponse> {
     return this.http.post<ProgresoResponse>(this.base, data);
   }
 
-  /** GET /api/progress — get history of progress. */
+  /** GET /api/progress — list weight history chronologically */
   consultarHistorial(): Observable<ProgresoResponse[]> {
     return this.http.get<ProgresoResponse[]>(this.base);
   }

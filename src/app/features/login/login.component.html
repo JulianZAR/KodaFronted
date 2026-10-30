@@ -1,0 +1,238 @@
+<div class="min-h-screen w-full bg-[#070c1c] flex items-center justify-center p-4 sm:p-6 lg:p-8">
+  <!-- Outer Container -->
+  <div class="w-full max-w-5xl bg-white rounded-3xl overflow-hidden shadow-2xl grid grid-cols-1 lg:grid-cols-12 min-h-[640px]">
+    
+    <!-- Left Column: Form -->
+    <div class="lg:col-span-6 p-8 sm:p-12 xl:p-16 flex flex-col justify-between bg-white">
+      <div>
+        <!-- Logo -->
+        <div class="flex items-center gap-3 mb-10">
+          <div class="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-600">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9 9 0 01-9-9c0-4.97 4.03-9 9-9 4.97 0 9 4.03 9 9 0 1.25-.26 2.44-.73 3.52M12 3v18m0-9h9" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 14l2 2 4-4" />
+            </svg>
+          </div>
+          <span class="text-2xl font-bold tracking-tight text-slate-900 flex items-center">
+            Nutri<span class="text-emerald-600">GO</span>
+          </span>
+        </div>
+
+        <!-- Welcome Text -->
+        <div class="mb-8">
+          <p class="text-[11px] font-bold tracking-wider uppercase text-emerald-700 mb-2">
+            Tu bienestar empieza aquí
+          </p>
+          <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight mb-2">
+            Bienvenido de nuevo
+          </h1>
+          <p class="text-sm text-slate-500">
+            Ingresa a tu cuenta para continuar con tu seguimiento nutricional.
+          </p>
+        </div>
+
+        <!-- Error Banner -->
+        <div *ngIf="errorMessage" class="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm flex items-center gap-2">
+          <svg class="w-5 h-5 shrink-0 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" stroke-width="2"/>
+            <line x1="12" y1="8" x2="12" y2="12" stroke-width="2"/>
+            <line x1="12" y1="16" x2="12.01" y2="16" stroke-width="2"/>
+          </svg>
+          <span>{{ errorMessage }}</span>
+        </div>
+
+        <!-- Credentials Form -->
+        <form (ngSubmit)="onSubmit()" autocomplete="off" class="space-y-5">
+          <!-- Email Input -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1.5">
+              Correo electrónico
+            </label>
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <input
+                type="email"
+                name="email"
+                [(ngModel)]="email"
+                required
+                autocomplete="off"
+                placeholder="ejemplo@correo.com"
+                class="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 text-slate-800 text-sm placeholder:text-slate-400 outline-none transition"
+              />
+            </div>
+          </div>
+
+          <!-- Password Input with Eye Toggle -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1.5">
+              Contraseña
+            </label>
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <input
+                [type]="showPassword ? 'text' : 'password'"
+                name="password"
+                [(ngModel)]="password"
+                required
+                autocomplete="off"
+                placeholder="••••••••"
+                class="w-full pl-11 pr-11 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 text-slate-800 text-sm placeholder:text-slate-400 outline-none transition"
+              />
+              <button
+                type="button"
+                (click)="showPassword = !showPassword"
+                class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition"
+                aria-label="Ver u ocultar contraseña"
+              >
+                <svg *ngIf="!showPassword" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                <svg *ngIf="showPassword" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Remember & Forgot Password -->
+          <div class="flex items-center justify-between text-xs pt-1">
+            <label class="flex items-center gap-2 cursor-pointer text-slate-600 select-none">
+              <input
+                type="checkbox"
+                name="rememberMe"
+                [(ngModel)]="rememberMe"
+                class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 transition cursor-pointer"
+              />
+              <span>Recordarme</span>
+            </label>
+            <a href="javascript:void(0)" class="font-semibold text-emerald-600 hover:text-emerald-700 transition">
+              ¿Olvidaste tu contraseña?
+            </a>
+          </div>
+
+          <!-- Submit Button -->
+          <button
+            type="submit"
+            [disabled]="loading"
+            class="w-full mt-2 py-3.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white font-semibold text-sm shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 transition disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            <span *ngIf="!loading">Iniciar sesión &gt;</span>
+            <span *ngIf="loading" class="flex items-center gap-2">
+              <svg class="animate-spin w-4 h-4 text-white" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+              </svg>
+              <span>Iniciando sesión...</span>
+            </span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Footer -->
+      <div class="pt-8 text-center text-xs text-slate-500">
+        ¿Aún no tienes una cuenta?
+        <a href="javascript:void(0)" class="font-semibold text-emerald-600 hover:text-emerald-700 ml-1 transition">
+          Regístrate aquí
+        </a>
+      </div>
+    </div>
+
+    <!-- Right Column: Promotional Dark Panel -->
+    <div class="lg:col-span-6 bg-[#0b132b] p-8 sm:p-12 xl:p-16 flex flex-col justify-between relative overflow-hidden border-t lg:border-t-0 lg:border-l border-slate-800">
+      <!-- Background Glow Elements -->
+      <div class="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none"></div>
+      <div class="absolute -bottom-24 -left-24 w-80 h-80 rounded-full bg-teal-500/10 blur-3xl pointer-events-none"></div>
+
+      <div>
+        <!-- AI Badge -->
+        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 border border-emerald-500/30 text-emerald-400 text-xs font-semibold mb-6 shadow-sm">
+          <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+          </svg>
+          <span>POTENCIADO POR IA</span>
+        </div>
+
+        <!-- Big Headline -->
+        <h2 class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight mb-4">
+          Nutrición inteligente.<br/>
+          <span class="text-emerald-400">Progreso real.</span>
+        </h2>
+        <p class="text-sm text-slate-300 max-w-md mb-8 leading-relaxed">
+          Seguimiento de IMC y nutrición personalizada que evoluciona contigo.
+        </p>
+
+        <!-- Floating Preview Card -->
+        <div class="p-6 rounded-2xl bg-[#131f37]/90 border border-slate-700/80 shadow-2xl relative max-w-sm">
+          <!-- Top Row with Leaf and Status -->
+          <div class="flex items-center justify-between mb-6">
+            <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 21a9 9 0 01-9-9c0-4.97 4.03-9 9-9 4.97 0 9 4.03 9 9 0 1.25-.26 2.44-.73 3.52M12 3v18" />
+              </svg>
+            </div>
+            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 ring-4 ring-emerald-400/20"></div>
+          </div>
+
+          <!-- Metrics Row -->
+          <div class="grid grid-cols-2 gap-4 items-center mb-6">
+            <div>
+              <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">IMC Actual</p>
+              <p class="text-3xl font-extrabold text-white">22.5</p>
+              <span class="inline-flex items-center gap-1 mt-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-full">
+                Normal
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+              </span>
+            </div>
+
+            <div class="text-right">
+              <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Meta de peso</p>
+              <div class="flex items-center justify-end gap-2">
+                <span class="text-xl font-bold text-white">65 kg</span>
+                <div class="w-7 h-7 rounded-full border-2 border-emerald-400 border-t-transparent flex items-center justify-center">
+                  <div class="w-2 h-2 rounded-full bg-emerald-400"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Progress Pill -->
+          <div class="p-3 rounded-xl bg-emerald-500 text-slate-900 font-bold flex items-center justify-between text-xs shadow-lg">
+            <div class="flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+              <span class="text-white text-[11px] uppercase tracking-wider font-semibold">Progreso</span>
+            </div>
+            <span class="text-white font-extrabold text-sm">-4.2 kg</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Social Proof Footer -->
+      <div class="pt-8 flex items-center gap-3">
+        <div class="flex -space-x-2 overflow-hidden">
+          <div class="inline-block h-8 w-8 rounded-full ring-2 ring-[#0b132b] bg-emerald-500 text-white font-bold text-[10px] flex items-center justify-center">JV</div>
+          <div class="inline-block h-8 w-8 rounded-full ring-2 ring-[#0b132b] bg-teal-600 text-white font-bold text-[10px] flex items-center justify-center">MR</div>
+          <div class="inline-block h-8 w-8 rounded-full ring-2 ring-[#0b132b] bg-sky-600 text-white font-bold text-[10px] flex items-center justify-center">AL</div>
+        </div>
+        <div>
+          <p class="text-xs font-bold text-white">+2,400 personas</p>
+          <p class="text-[11px] text-slate-400">mejorando sus hábitos cada día</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
