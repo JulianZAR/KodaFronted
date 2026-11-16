@@ -3,9 +3,11 @@ import { CommonModule, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SidebarComponent } from '../../shared/sidebar/sidebar.component';
 import { HeaderComponent } from '../../shared/header/header.component';
-import { ImcService, ImcResponse, IMC_META, ImcCategoria } from '../../core/services/imc.service';
+import { Observable, of, switchMap, tap } from 'rxjs';
+import { ImcService, ImcResponse, infoImc } from '../../core/services/imc.service';
 import { ProgresoService, ProgresoResponse } from '../../core/services/progreso.service';
 import { UsuarioService, PerfilResponse } from '../../core/services/usuario.service';
+import { esEstado, mensajeDeError } from '../../core/http/mensaje-error';
 
 interface HistorialItem {
   id: string;
@@ -55,6 +57,10 @@ interface HistorialItem {
             </div>
           </div>
 
+          <div *ngIf="errorCarga" class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-sm">
+            {{ errorCarga }}
+          </div>
+
           <!-- 2 Cards Grid: Data Input + Result -->
           <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
             
@@ -93,10 +99,10 @@ interface HistorialItem {
                           [(ngModel)]="estaturaCm"
                           name="estaturaCm"
                           required
-                          min="50"
+                          min="30"
                           max="250"
                           step="1"
-                          placeholder="177"
+                          placeholder="170"
                           class="w-full pl-4 pr-12 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 text-slate-800 font-semibold text-base outline-none transition"
                         />
                         <span class="absolute inset-y-0 right-0 pr-4 flex items-center text-xs font-semibold text-slate-400 pointer-events-none">
@@ -116,8 +122,8 @@ interface HistorialItem {
                           [(ngModel)]="pesoKg"
                           name="pesoKg"
                           required
-                          min="20"
-                          max="300"
+                          min="1"
+                          max="500"
                           step="0.1"
                           placeholder="70"
                           class="w-full pl-4 pr-12 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 text-slate-800 font-semibold text-base outline-none transition"
@@ -187,13 +193,13 @@ interface HistorialItem {
                 <!-- Big Numeric Value & Category -->
                 <div class="flex items-baseline gap-3 mb-2">
                   <span class="text-5xl sm:text-6xl font-extrabold tracking-tight text-white">
-                    {{ imcValor ? (imcValor | number:'1.1-1') : '22.3' }}
+                    {{ imc ? (imc.valor | number:'1.1-1') : '—' }}
                   </span>
                   <span class="text-slate-400 text-sm font-medium">kg/m²</span>
                 </div>
 
                 <!-- Status Badge -->
-                <div class="mb-3">
+                <div class="mb-3" *ngIf="imcInfo">
                   <span
                     class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border"
                     [ngClass]="imcInfo.badgeClass"
@@ -205,7 +211,7 @@ interface HistorialItem {
 
                 <!-- Descriptive text -->
                 <p class="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-md">
-                  {{ imcInfo.description }}
+                  {{ imcInfo ? imcInfo.description : 'Ingresa tu estatura y tu peso y presiona «Calcular y Registrar» para conocer tu IMC.' }}
                 </p>
               </div>
 
@@ -214,11 +220,12 @@ interface HistorialItem {
                 <!-- Pin marker positioned at percentage -->
                 <div class="relative h-6 mb-1">
                   <div
+                    *ngIf="imc"
                     class="absolute -translate-x-1/2 flex flex-col items-center transition-all duration-500 ease-out"
                     [style.left]="imcBarPercent + '%'"
                   >
                     <div class="bg-white text-slate-900 text-[10px] font-extrabold px-2 py-0.5 rounded shadow-md border border-slate-200">
-                      {{ imcValor ? (imcValor | number:'1.1-1') : '22.3' }}
+                      {{ imc.valor | number:'1.1-1' }}
                     </div>
                     <div class="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[4px] border-t-white"></div>
                   </div>
@@ -325,7 +332,7 @@ interface HistorialItem {
                     </td>
                   </tr>
 
-                  <tr *ngIf="historial.length === 0">
+                  <tr *ngIf="historial.length === 0 && !cargandoHistorial">
                     <td colspan="5" class="py-8 text-center text-slate-400 text-xs">
                       No hay registros de progreso aún. Ingresa tu peso actual arriba para comenzar.
                     </td>
@@ -346,25 +353,28 @@ export class DashboardComponent implements OnInit {
   private readonly progresoService = inject(ProgresoService);
   private readonly usuarioService = inject(UsuarioService);
 
-  estaturaCm: number = 177;
-  pesoKg: number = 70;
+  perfil: PerfilResponse | null = null;
+  estaturaCm: number | null = null;
+  pesoKg: number | null = null;
   saving = false;
   submitSuccess = false;
   submitError = '';
+  errorCarga = '';
 
-  imcValor: number = 22.3;
-  imcCategoria: ImcCategoria = 'PESO_NORMAL';
+  /** IMC calculado por el backend; null mientras el perfil esté incompleto. */
+  imc: ImcResponse | null = null;
   historial: HistorialItem[] = [];
+  cargandoHistorial = true;
 
   get imcInfo() {
-    return IMC_META[this.imcCategoria] || IMC_META.PESO_NORMAL;
+    return infoImc(this.imc?.categoria);
   }
 
   get imcBarPercent(): number {
-    // Normalizes IMC between 14 and 38 for horizontal bar pin positioning
+    // Normaliza el IMC entre 14 y 38 para posicionar el marcador en la barra
     const min = 14;
     const max = 38;
-    const clamped = Math.min(Math.max(this.imcValor || 22.3, min), max);
+    const clamped = Math.min(Math.max(this.imc?.valor ?? min, min), max);
     return Math.round(((clamped - min) / (max - min)) * 100);
   }
 
@@ -377,48 +387,51 @@ export class DashboardComponent implements OnInit {
   cargarDatosUsuario(): void {
     this.usuarioService.obtenerPerfil().subscribe({
       next: (perfil) => {
-        if (perfil.estaturaCm) this.estaturaCm = perfil.estaturaCm;
-        if (perfil.pesoKg) this.pesoKg = perfil.pesoKg;
+        this.perfil = perfil;
+        this.estaturaCm = perfil.estaturaCm;
+        this.pesoKg = perfil.pesoKg;
       },
-      error: () => {
-        // Fallback defaults already set
-      }
+      error: (err) => this.errorCarga = mensajeDeError(err, 'No se pudo cargar tu perfil.'),
     });
   }
 
   cargarImc(): void {
     this.imcService.miImcActual().subscribe({
-      next: (res) => {
-        this.imcValor = res.valor;
-        this.imcCategoria = res.categoria;
+      next: (res) => this.imc = res,
+      error: (err) => {
+        // 409 = perfil sin peso o estatura todavía: no es un error, solo no hay IMC
+        this.imc = null;
+        if (!esEstado(err, 409)) {
+          this.errorCarga = mensajeDeError(err, 'No se pudo consultar tu IMC.');
+        }
       },
-      error: () => {
-        // Fallback local calculate
-        const local = this.imcService.calcularLocal(this.pesoKg, this.estaturaCm);
-        this.imcValor = local.valor;
-        this.imcCategoria = local.categoria;
-      }
     });
   }
 
   cargarHistorial(): void {
+    this.cargandoHistorial = true;
     this.progresoService.consultarHistorial().subscribe({
       next: (data) => {
-        if (data && data.length > 0) {
-          this.historial = this.mapearHistorial(data);
-        } else {
-          this.historial = this.getMockHistorial();
-        }
+        this.historial = this.mapearHistorial(data ?? []);
+        this.cargandoHistorial = false;
       },
-      error: () => {
-        this.historial = this.getMockHistorial();
-      }
+      error: (err) => {
+        this.historial = [];
+        this.cargandoHistorial = false;
+        this.errorCarga = mensajeDeError(err, 'No se pudo cargar tu historial.');
+      },
     });
   }
 
   registrarPesaje(): void {
-    if (!this.pesoKg || this.pesoKg <= 0 || !this.estaturaCm || this.estaturaCm <= 0) {
-      this.submitError = 'Por favor ingresa estatura y peso válidos.';
+    const estatura = Number(this.estaturaCm);
+    const peso = Number(this.pesoKg);
+    if (!estatura || estatura < 30 || estatura > 250) {
+      this.submitError = 'La estatura debe estar entre 30 y 250 cm.';
+      return;
+    }
+    if (!peso || peso < 1 || peso > 500) {
+      this.submitError = 'El peso debe estar entre 1 y 500 kg.';
       return;
     }
 
@@ -426,35 +439,27 @@ export class DashboardComponent implements OnInit {
     this.submitSuccess = false;
     this.submitError = '';
 
-    // Register weight in backend
-    this.progresoService.registrar({ pesoKg: this.pesoKg }).subscribe({
+    // El IMC se calcula con la estatura del perfil: si cambió, se guarda primero.
+    const guardarEstatura$: Observable<unknown> = this.perfil?.estaturaCm === estatura
+      ? of(null)
+      : this.usuarioService.actualizarPerfil({ estaturaCm: estatura, meta: this.perfil?.meta ?? null })
+          .pipe(tap(perfil => this.perfil = perfil));
+
+    guardarEstatura$.pipe(
+      switchMap(() => this.progresoService.registrar({ pesoKg: peso })),
+    ).subscribe({
       next: (progreso) => {
         this.saving = false;
         this.submitSuccess = true;
-        this.imcValor = progreso.imc;
-        this.imcCategoria = this.imcService.calcularLocal(this.pesoKg, this.estaturaCm).categoria;
+        this.imc = { valor: progreso.imc, categoria: progreso.categoria };
+        if (this.perfil) this.perfil = { ...this.perfil, pesoKg: progreso.pesoKg };
         this.cargarHistorial();
         setTimeout(() => this.submitSuccess = false, 3500);
       },
-      error: () => {
-        // Fallback local update to prevent broken UX
+      error: (err) => {
         this.saving = false;
-        this.submitSuccess = true;
-        const local = this.imcService.calcularLocal(this.pesoKg, this.estaturaCm);
-        this.imcValor = local.valor;
-        this.imcCategoria = local.categoria;
-        this.historial.unshift({
-          id: 'local-' + Date.now(),
-          fecha: 'Hoy, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          pesoKg: this.pesoKg,
-          imc: this.imcValor,
-          estado: this.imcInfo.label,
-          badgeClass: this.imcInfo.badgeClass,
-          dotColor: this.imcInfo.colorHex,
-          cambioKg: this.historial.length > 0 ? parseFloat((this.pesoKg - this.historial[0].pesoKg).toFixed(1)) : 0,
-        });
-        setTimeout(() => this.submitSuccess = false, 3500);
-      }
+        this.submitError = mensajeDeError(err, 'No se pudo registrar el pesaje. Intenta de nuevo.');
+      },
     });
   }
 
@@ -462,8 +467,7 @@ export class DashboardComponent implements OnInit {
     return data.map((item, index) => {
       const prev = data[index + 1];
       const cambio = prev ? parseFloat((item.pesoKg - prev.pesoKg).toFixed(1)) : null;
-      const cat = this.imcService.calcularLocal(item.pesoKg, this.estaturaCm).categoria;
-      const meta = IMC_META[cat] || IMC_META.PESO_NORMAL;
+      const info = infoImc(item.categoria);
 
       const dateObj = new Date(item.fecha);
       const isToday = new Date().toDateString() === dateObj.toDateString();
@@ -476,57 +480,12 @@ export class DashboardComponent implements OnInit {
         fecha: fechaStr,
         pesoKg: item.pesoKg,
         imc: item.imc,
-        estado: meta.label,
-        badgeClass: meta.badgeClass,
-        dotColor: meta.colorHex,
+        estado: info?.label ?? item.categoria,
+        badgeClass: info?.badgeClass ?? 'bg-slate-100 text-slate-600 border-slate-200',
+        dotColor: info?.colorHex ?? '#94a3b8',
         cambioKg: cambio,
       };
     });
-  }
-
-  private getMockHistorial(): HistorialItem[] {
-    return [
-      {
-        id: '1',
-        fecha: 'Hoy, 08:30',
-        pesoKg: 70.0,
-        imc: 22.3,
-        estado: 'Normal',
-        badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-        dotColor: '#10b981',
-        cambioKg: -0.8,
-      },
-      {
-        id: '2',
-        fecha: '12 May 2026',
-        pesoKg: 70.8,
-        imc: 22.6,
-        estado: 'Normal',
-        badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-        dotColor: '#10b981',
-        cambioKg: -0.7,
-      },
-      {
-        id: '3',
-        fecha: '05 May 2026',
-        pesoKg: 71.5,
-        imc: 22.8,
-        estado: 'Normal',
-        badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-        dotColor: '#10b981',
-        cambioKg: -0.5,
-      },
-      {
-        id: '4',
-        fecha: '28 Abr 2026',
-        pesoKg: 72.0,
-        imc: 23.0,
-        estado: 'Normal',
-        badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-        dotColor: '#10b981',
-        cambioKg: null,
-      },
-    ];
   }
 
   exportarCsvEstatico(): void {

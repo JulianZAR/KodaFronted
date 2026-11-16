@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* ============================================================
    NutriGO — Global Styles & Design System
    ============================================================ */

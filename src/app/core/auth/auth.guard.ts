@@ -3,14 +3,14 @@ import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from './auth.service';
 
 /**
- * Route guard: redirects unauthenticated users to /login.
+ * Si no hay sesión, envía a /login guardando la ruta pedida para volver a ella
+ * después de autenticarse en Keycloak.
  */
-export const authGuard: CanActivateFn = () => {
-  const auth   = inject(AuthService);
+export const authGuard: CanActivateFn = (_route, state) => {
+  const auth = inject(AuthService);
   const router = inject(Router);
 
   if (auth.isAuthenticated) return true;
 
-  router.navigate(['/login']);
-  return false;
+  return router.createUrlTree(['/login'], { queryParams: { redirect: state.url } });
 };

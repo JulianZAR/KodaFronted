@@ -3,13 +3,8 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
-export type ImcCategoria =
-  | 'BAJO_PESO'
-  | 'PESO_NORMAL'
-  | 'SOBREPESO'
-  | 'OBESIDAD_I'
-  | 'OBESIDAD_II'
-  | 'OBESIDAD_III';
+/** Mismas categorías que CategoriaImc del backend (rangos OMS). */
+export type ImcCategoria = 'BAJO_PESO' | 'NORMAL' | 'SOBREPESO' | 'OBESIDAD';
 
 export interface ImcResponse {
   valor: number;
@@ -21,19 +16,21 @@ export interface CalcularImcRequest {
   estaturaCm: number;
 }
 
-export const IMC_META: Record<ImcCategoria, {
+export interface ImcInfo {
   label: string;
   badgeClass: string;
   colorHex: string;
   description: string;
-}> = {
+}
+
+export const IMC_META: Record<ImcCategoria, ImcInfo> = {
   BAJO_PESO: {
     label: 'Bajo peso',
     badgeClass: 'bg-blue-100 text-blue-700 border-blue-200',
     colorHex: '#3b82f6',
     description: 'Tu peso está por debajo de lo recomendado. Consulta con un nutricionista para alcanzar un peso saludable.',
   },
-  PESO_NORMAL: {
+  NORMAL: {
     label: 'Normal',
     badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300',
     colorHex: '#10b981',
@@ -43,58 +40,34 @@ export const IMC_META: Record<ImcCategoria, {
     label: 'Sobrepeso',
     badgeClass: 'bg-amber-100 text-amber-800 border-amber-300',
     colorHex: '#f59e0b',
-    description: 'Tu IMC indica un ligero sobrepeso. Pequeños cambios en alimentación y actividad física marcarán la diferencia.',
+    description: 'Tu IMC indica sobrepeso. Pequeños cambios en alimentación y actividad física marcarán la diferencia.',
   },
-  OBESIDAD_I: {
-    label: 'Obesidad I',
-    badgeClass: 'bg-orange-100 text-orange-800 border-orange-300',
-    colorHex: '#f97316',
-    description: 'Presentas obesidad grado I. Es recomendable un plan nutricional estructurado con seguimiento profesional.',
-  },
-  OBESIDAD_II: {
-    label: 'Obesidad II',
+  OBESIDAD: {
+    label: 'Obesidad',
     badgeClass: 'bg-rose-100 text-rose-800 border-rose-300',
     colorHex: '#f43f5e',
-    description: 'Presentas obesidad grado II. Te sugerimos consultar a un especialista para una evaluación detallada.',
-  },
-  OBESIDAD_III: {
-    label: 'Obesidad III',
-    badgeClass: 'bg-red-100 text-red-800 border-red-300',
-    colorHex: '#ef4444',
-    description: 'Presentas obesidad grado III. Prioriza la atención médica y nutricional integral.',
+    description: 'Tu IMC está en rango de obesidad. Es recomendable un plan nutricional con seguimiento profesional.',
   },
 };
 
+/** Información visual de una categoría; null si viene vacía o es desconocida. */
+export function infoImc(categoria: string | null | undefined): ImcInfo | null {
+  return categoria && categoria in IMC_META ? IMC_META[categoria as ImcCategoria] : null;
+}
+
+/** El IMC siempre lo calcula el backend (CalculadoraIMC); aquí solo se consulta. */
 @Injectable({ providedIn: 'root' })
 export class ImcService {
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.apiUrl}/api/imc`;
 
-  /** GET /api/imc/me — returns current calculated IMC based on latest saved weight and height */
+  /** GET /api/imc/me — IMC con el peso y la estatura guardados (409 si el perfil está incompleto). */
   miImcActual(): Observable<ImcResponse> {
     return this.http.get<ImcResponse>(`${this.base}/me`);
   }
 
-  /** Calculates local IMC client-side fallback if offline */
-  calcularLocal(pesoKg: number, estaturaCm: number): ImcResponse {
-    const estaturaM = estaturaCm / 100;
-    const valor = parseFloat((pesoKg / (estaturaM * estaturaM)).toFixed(1));
-    let categoria: ImcCategoria = 'PESO_NORMAL';
-
-    if (valor < 18.5) {
-      categoria = 'BAJO_PESO';
-    } else if (valor < 25.0) {
-      categoria = 'PESO_NORMAL';
-    } else if (valor < 30.0) {
-      categoria = 'SOBREPESO';
-    } else if (valor < 35.0) {
-      categoria = 'OBESIDAD_I';
-    } else if (valor < 40.0) {
-      categoria = 'OBESIDAD_II';
-    } else {
-      categoria = 'OBESIDAD_III';
-    }
-
-    return { valor, categoria };
+  /** POST /api/imc — calcula un IMC sin guardar nada. */
+  calcular(data: CalcularImcRequest): Observable<ImcResponse> {
+    return this.http.post<ImcResponse>(this.base, data);
   }
 }

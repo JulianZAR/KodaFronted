@@ -1,11 +1,23 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/auth/auth.guard';
+import { rolGuard } from './core/auth/rol.guard';
 
 export const routes: Routes = [
   {
     path: '',
-    redirectTo: 'dashboard',
+    redirectTo: 'inicio',
     pathMatch: 'full',
+  },
+  {
+    path: 'inicio',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/inicio/inicio.component').then(m => m.InicioComponent),
+  },
+  // La calculadora de IMC antes vivía en /dashboard; se conserva la ruta vieja.
+  {
+    path: 'dashboard',
+    redirectTo: 'calculadora',
   },
   {
     path: 'login',
@@ -13,7 +25,7 @@ export const routes: Routes = [
       import('./features/login/login.component').then(m => m.LoginComponent),
   },
   {
-    path: 'dashboard',
+    path: 'calculadora',
     canActivate: [authGuard],
     loadComponent: () =>
       import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent),
@@ -42,8 +54,28 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/perfil/perfil.component').then(m => m.PerfilComponent),
   },
+  // Personal clínico: NUTRITIONIST y ADMIN
+  {
+    path: 'pacientes',
+    canActivate: [rolGuard('NUTRITIONIST', 'ADMIN')],
+    loadComponent: () =>
+      import('./features/pacientes/pacientes.component').then(m => m.PacientesComponent),
+  },
+  {
+    path: 'pacientes/:id',
+    canActivate: [rolGuard('NUTRITIONIST', 'ADMIN')],
+    loadComponent: () =>
+      import('./features/pacientes/paciente-detalle.component').then(m => m.PacienteDetalleComponent),
+  },
+  // Solo ADMIN
+  {
+    path: 'admin/usuarios',
+    canActivate: [rolGuard('ADMIN')],
+    loadComponent: () =>
+      import('./features/admin/admin-usuarios.component').then(m => m.AdminUsuariosComponent),
+  },
   {
     path: '**',
-    redirectTo: 'dashboard',
+    redirectTo: 'inicio',
   },
 ];

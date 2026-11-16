@@ -8,7 +8,7 @@ import { AuthService } from '../../core/auth/auth.service';
   imports: [RouterLink, RouterLinkActive],
   template: `
     <nav class="bottom-nav" role="navigation" aria-label="Navegación principal">
-      <a id="nav-dashboard" routerLink="/dashboard" routerLinkActive="active"
+      <a id="nav-dashboard" routerLink="/inicio" routerLinkActive="active"
          class="nav-item" aria-label="Inicio">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"

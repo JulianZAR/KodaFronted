@@ -3,9 +3,10 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SidebarComponent } from '../../shared/sidebar/sidebar.component';
 import { HeaderComponent } from '../../shared/header/header.component';
-import { UsuarioService, PerfilResponse, Meta } from '../../core/services/usuario.service';
+import { UsuarioService, PerfilResponse, Meta, METAS } from '../../core/services/usuario.service';
 import { ProgresoService } from '../../core/services/progreso.service';
 import { AuthService } from '../../core/auth/auth.service';
+import { mensajeDeError } from '../../core/http/mensaje-error';
 
 @Component({
   selector: 'app-perfil',
@@ -96,10 +97,10 @@ import { AuthService } from '../../core/auth/auth.service';
                       [(ngModel)]="estaturaCm"
                       name="estaturaCm"
                       required
-                      min="50"
+                      min="30"
                       max="250"
                       step="1"
-                      placeholder="177"
+                      placeholder="170"
                       class="w-full pl-4 pr-12 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 text-slate-800 font-semibold text-sm outline-none transition"
                     />
                     <span class="absolute inset-y-0 right-0 pr-4 flex items-center text-xs font-semibold text-slate-400 pointer-events-none">
@@ -118,9 +119,8 @@ import { AuthService } from '../../core/auth/auth.service';
                       type="number"
                       [(ngModel)]="pesoKg"
                       name="pesoKg"
-                      required
-                      min="20"
-                      max="300"
+                      min="1"
+                      max="500"
                       step="0.1"
                       placeholder="70.0"
                       class="w-full pl-4 pr-12 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 text-slate-800 font-semibold text-sm outline-none transition"
@@ -140,13 +140,10 @@ import { AuthService } from '../../core/auth/auth.service';
                 <select
                   [(ngModel)]="meta"
                   name="meta"
-                  required
                   class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 text-slate-800 font-semibold text-sm outline-none transition bg-white"
                 >
-                  <option value="MANTENER_PESO">Mantener peso actual</option>
-                  <option value="PERDER_PESO">Perder peso / Reducir grasa</option>
-                  <option value="GANAR_MASA_MUSCULAR">Aumentar masa muscular</option>
-                  <option value="MEJORAR_HABITOS">Mejorar hábitos saludables</option>
+                  <option [ngValue]="null">Sin definir</option>
+                  <option *ngFor="let m of metas" [ngValue]="m.valor">{{ m.label }}</option>
                 </select>
               </div>
 
@@ -180,10 +177,12 @@ export class PerfilComponent implements OnInit {
   private readonly progresoService = inject(ProgresoService);
   readonly authService = inject(AuthService);
 
+  readonly metas = METAS;
+
   perfil: PerfilResponse | null = null;
-  estaturaCm: number = 177;
-  pesoKg: number = 70;
-  meta: Meta = 'MANTENER_PESO';
+  estaturaCm: number | null = null;
+  pesoKg: number | null = null;
+  meta: Meta | null = null;
 
   guardando = false;
   mensajeExito = '';
@@ -195,30 +194,21 @@ export class PerfilComponent implements OnInit {
 
   cargarPerfil(): void {
     this.usuarioService.obtenerPerfil().subscribe({
-      next: (res) => {
-        this.perfil = res;
-        if (res.estaturaCm) this.estaturaCm = res.estaturaCm;
-        if (res.pesoKg) this.pesoKg = res.pesoKg;
-        if (res.meta) this.meta = res.meta;
-      },
-      error: () => {
-        // Fallback default profile
-        this.perfil = {
-          id: '1',
-          nombre: this.authService.userName,
-          email: this.authService.userEmail,
-          estaturaCm: 177,
-          pesoKg: 70,
-          meta: 'MANTENER_PESO',
-          fechaRegistro: new Date().toISOString(),
-        };
-      }
+      next: (res) => this.aplicarPerfil(res),
+      error: (err) => this.mensajeError = mensajeDeError(err, 'No se pudo cargar tu perfil.'),
     });
   }
 
   guardarCambios(): void {
-    if (!this.estaturaCm || this.estaturaCm <= 0 || !this.pesoKg || this.pesoKg <= 0) {
-      this.mensajeError = 'Por favor ingresa valores válidos.';
+    const estatura = Number(this.estaturaCm);
+    const peso = this.pesoKg === null || this.pesoKg === undefined || `${this.pesoKg}` === '' ? null : Number(this.pesoKg);
+
+    if (!estatura || estatura < 30 || estatura > 250) {
+      this.mensajeError = 'La estatura debe estar entre 30 y 250 cm.';
+      return;
+    }
+    if (peso !== null && (peso < 1 || peso > 500)) {
+      this.mensajeError = 'El peso debe estar entre 1 y 500 kg.';
       return;
     }
 
@@ -226,38 +216,51 @@ export class PerfilComponent implements OnInit {
     this.mensajeExito = '';
     this.mensajeError = '';
 
-    // Update height & goal
-    this.usuarioService.actualizarPerfil({
-      estaturaCm: this.estaturaCm,
-      meta: this.meta,
-    }).subscribe({
-      next: () => {
-        // Also sync weight if updated
-        this.progresoService.registrar({ pesoKg: this.pesoKg }).subscribe({
-          next: () => {
-            this.guardando = false;
-            this.mensajeExito = '¡Perfil y mediciones actualizados con éxito!';
-            setTimeout(() => this.mensajeExito = '', 4000);
+    this.usuarioService.actualizarPerfil({ estaturaCm: estatura, meta: this.meta }).subscribe({
+      next: (perfil) => {
+        this.aplicarPerfil(perfil);
+
+        // El peso se guarda como un nuevo punto de progreso, solo si cambió.
+        if (peso === null || peso === perfil.pesoKg) {
+          this.terminarConExito('¡Perfil actualizado con éxito!');
+          return;
+        }
+        this.progresoService.registrar({ pesoKg: peso }).subscribe({
+          next: (progreso) => {
+            this.perfil = { ...perfil, pesoKg: progreso.pesoKg };
+            this.pesoKg = progreso.pesoKg;
+            this.terminarConExito('¡Perfil y peso actualizados con éxito!');
           },
-          error: () => {
+          error: (err) => {
             this.guardando = false;
-            this.mensajeExito = '¡Perfil actualizado con éxito!';
-            setTimeout(() => this.mensajeExito = '', 4000);
-          }
+            this.mensajeError = 'Tu perfil se guardó, pero no se pudo registrar el peso: '
+              + mensajeDeError(err, 'intenta de nuevo.');
+          },
         });
       },
-      error: () => {
-        // Fallback local update
+      error: (err) => {
         this.guardando = false;
-        this.mensajeExito = '¡Perfil guardado localmente con éxito!';
-        setTimeout(() => this.mensajeExito = '', 4000);
-      }
+        this.mensajeError = mensajeDeError(err, 'No se pudo guardar tu perfil. Intenta de nuevo.');
+      },
     });
   }
 
   formatFecha(fechaIso?: string): string {
-    if (!fechaIso) return 'Reciente';
+    if (!fechaIso) return '—';
     const date = new Date(fechaIso);
     return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' });
+  }
+
+  private aplicarPerfil(perfil: PerfilResponse): void {
+    this.perfil = perfil;
+    this.estaturaCm = perfil.estaturaCm;
+    this.pesoKg = perfil.pesoKg;
+    this.meta = perfil.meta;
+  }
+
+  private terminarConExito(mensaje: string): void {
+    this.guardando = false;
+    this.mensajeExito = mensaje;
+    setTimeout(() => this.mensajeExito = '', 4000);
   }
 }
