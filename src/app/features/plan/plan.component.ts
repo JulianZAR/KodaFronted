@@ -3,6 +3,8 @@ import { CommonModule } from '@angular/common';
 import { SidebarComponent } from '../../shared/sidebar/sidebar.component';
 import { HeaderComponent } from '../../shared/header/header.component';
 import { PlanService, PlanResponse } from '../../core/services/plan.service';
+import { etiquetaMeta } from '../../core/services/usuario.service';
+import { mensajeDeError } from '../../core/http/mensaje-error';
 
 @Component({
   selector: 'app-plan',
@@ -38,6 +40,14 @@ import { PlanService, PlanResponse } from '../../core/services/plan.service';
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
             </svg>
             <p class="text-xs text-slate-400 font-medium">Cargando tu plan nutricional...</p>
+          </div>
+
+          <!-- Error -->
+          <div *ngIf="!cargando && errorCarga" class="bg-white rounded-3xl p-10 border border-rose-200 shadow-sm text-center max-w-2xl mx-auto my-8">
+            <p class="text-sm text-rose-700 mb-4">{{ errorCarga }}</p>
+            <button type="button" (click)="cargarPlan()" class="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs transition">
+              Reintentar
+            </button>
           </div>
 
           <!-- Plan Card (When Plan Exists) -->
@@ -122,7 +132,7 @@ import { PlanService, PlanResponse } from '../../core/services/plan.service';
           </div>
 
           <!-- Empty State (When 404 or No Plan Assigned) -->
-          <div *ngIf="!cargando && !plan" class="bg-white rounded-3xl p-10 sm:p-16 border border-slate-200/80 shadow-sm text-center max-w-2xl mx-auto my-8 animate-fade-in">
+          <div *ngIf="!cargando && !plan && !errorCarga" class="bg-white rounded-3xl p-10 sm:p-16 border border-slate-200/80 shadow-sm text-center max-w-2xl mx-auto my-8 animate-fade-in">
             <div class="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200 mx-auto flex items-center justify-center mb-5 shadow-inner">
               <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -140,7 +150,7 @@ import { PlanService, PlanResponse } from '../../core/services/plan.service';
               <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span>Mantén actualizado tu peso e IMC en el Dashboard para facilitar la evaluación.</span>
+              <span>Mantén actualizado tu peso e IMC en la Calculadora de IMC para facilitar la evaluación.</span>
             </div>
           </div>
 
@@ -154,6 +164,7 @@ export class PlanComponent implements OnInit {
 
   plan: PlanResponse | null = null;
   cargando = true;
+  errorCarga = '';
 
   ngOnInit(): void {
     this.cargarPlan();
@@ -161,39 +172,27 @@ export class PlanComponent implements OnInit {
 
   cargarPlan(): void {
     this.cargando = true;
+    this.errorCarga = '';
     this.planService.obtenerMiPlan().subscribe({
       next: (res) => {
-        this.plan = res;
+        this.plan = res; // null = aún sin plan asignado
         this.cargando = false;
       },
-      error: () => {
-        // Fallback demo plan if not assigned yet
-        this.plan = {
-          id: 'demo-1',
-          nombre: 'Plan Nutricional de Recomposición Corporal',
-          objetivo: 'MANTENER_PESO',
-          descripcion: 'Plan equilibrado enfocado en el mantenimiento de un índice de masa corporal saludable, optimizando el aporte proteico (1.6g/kg) y la ingesta balanceada de micronutrientes y fibra dietaria.',
-          fechaAsignacion: new Date().toISOString(),
-        };
+      error: (err) => {
+        this.plan = null;
         this.cargando = false;
-      }
+        this.errorCarga = mensajeDeError(err, 'No se pudo cargar tu plan nutricional.');
+      },
     });
   }
 
   formatFecha(fechaIso: string): string {
-    if (!fechaIso) return 'Reciente';
+    if (!fechaIso) return '—';
     const date = new Date(fechaIso);
     return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' });
   }
 
   formatObjetivo(obj: string): string {
-    switch (obj) {
-      case 'MANTENER_PESO': return 'Mantenimiento';
-      case 'PERDER_PESO': return 'Déficit calórico';
-      case 'GANAR_MASA_MUSCULAR': return 'Superávit / Masa';
-      case 'MEJORAR_HABITOS': return 'Hábitos saludables';
-      default: return obj || 'Personalizado';
-    }
+    return etiquetaMeta(obj, true);
   }
 }
-

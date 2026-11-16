@@ -1,7 +1,19 @@
-import { Component, inject } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../core/auth/auth.service';
+import { ProgresoService } from '../../core/services/progreso.service';
+import { diasDesde, textoDias } from '../../core/util/tiempo';
+
+/** Se recomienda registrar el peso al menos una vez por semana. */
+const DIAS_POR_PESAJE = 7;
+
+interface Seguimiento {
+  texto: string;
+  consejo: string;
+  porcentaje: number;
+  alDia: boolean;
+}
 
 @Component({
   selector: 'app-sidebar',
@@ -33,10 +45,10 @@ import { AuthService } from '../../core/auth/auth.service';
     <aside
       [class.translate-x-0]="isOpen"
       [class.-translate-x-full]="!isOpen"
-      class="fixed inset-y-0 left-0 z-40 w-72 bg-[#0b132b] text-slate-200 flex flex-col justify-between border-r border-slate-800/80 transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:h-screen lg:shrink-0"
+      class="fixed inset-y-0 left-0 z-40 w-72 bg-[#0b132b] text-slate-200 flex flex-col justify-between border-r border-slate-800/80 transition-transform duration-300 ease-in-out lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:shrink-0"
     >
       <!-- Top Section -->
-      <div class="p-6">
+      <div class="p-6 flex-1 min-h-0 overflow-y-auto">
         <!-- Logo -->
         <div class="flex items-center gap-3 mb-8">
           <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-inner">
@@ -62,7 +74,7 @@ import { AuthService } from '../../core/auth/auth.service';
         <nav class="space-y-1.5" (click)="isOpen = false">
           <!-- Inicio -->
           <a
-            routerLink="/dashboard"
+            routerLink="/inicio"
             routerLinkActive="bg-emerald-500/15 text-emerald-400 border-l-4 border-emerald-500 font-medium"
             [routerLinkActiveOptions]="{ exact: true }"
             class="flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-sm font-normal text-slate-300 hover:text-white hover:bg-slate-800/60 transition group"
@@ -75,7 +87,7 @@ import { AuthService } from '../../core/auth/auth.service';
 
           <!-- Calculadora IMC -->
           <a
-            routerLink="/dashboard"
+            routerLink="/calculadora"
             routerLinkActive="bg-emerald-500/15 text-emerald-400 border-l-4 border-emerald-500 font-medium"
             class="flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-sm font-normal text-slate-300 hover:text-white hover:bg-slate-800/60 transition group"
           >
@@ -104,7 +116,7 @@ import { AuthService } from '../../core/auth/auth.service';
           <a
             routerLink="/plan"
             routerLinkActive="bg-emerald-500/15 text-emerald-400 border-l-4 border-emerald-500 font-medium"
-            class="flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-normal text-slate-300 hover:text-white hover:bg-slate-800/60 transition group"
+            class="flex items-center px-3.5 py-2.5 rounded-xl text-sm font-normal text-slate-300 hover:text-white hover:bg-slate-800/60 transition group"
           >
             <div class="flex items-center gap-3.5">
               <svg class="w-5 h-5 text-slate-400 group-hover:text-emerald-400 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -112,9 +124,6 @@ import { AuthService } from '../../core/auth/auth.service';
               </svg>
               <span>Planes Nutricionales</span>
             </div>
-            <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
-              Nuevo
-            </span>
           </a>
 
           <!-- Reportes -->
@@ -141,14 +150,47 @@ import { AuthService } from '../../core/auth/auth.service';
             <span>Perfil</span>
           </a>
         </nav>
+
+        <!-- Gestión: solo NUTRITIONIST y ADMIN -->
+        <ng-container *ngIf="authService.esPersonalClinico">
+          <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400/90 px-3 mt-6 mb-3">
+            Gestión
+          </p>
+          <nav class="space-y-1.5" (click)="isOpen = false">
+            <a
+              routerLink="/pacientes"
+              routerLinkActive="bg-emerald-500/15 text-emerald-400 border-l-4 border-emerald-500 font-medium"
+              class="flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-sm font-normal text-slate-300 hover:text-white hover:bg-slate-800/60 transition group"
+            >
+              <svg class="w-5 h-5 text-slate-400 group-hover:text-emerald-400 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              <span>Pacientes</span>
+            </a>
+
+            <a
+              *ngIf="authService.esAdmin"
+              routerLink="/admin/usuarios"
+              routerLinkActive="bg-emerald-500/15 text-emerald-400 border-l-4 border-emerald-500 font-medium"
+              class="flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-sm font-normal text-slate-300 hover:text-white hover:bg-slate-800/60 transition group"
+            >
+              <svg class="w-5 h-5 text-slate-400 group-hover:text-emerald-400 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+              <span>Usuarios y roles</span>
+            </a>
+          </nav>
+        </ng-container>
       </div>
 
       <!-- Bottom Section -->
       <div class="p-6 space-y-4">
-        <!-- Weekly Goal Card (Static UI according to guidelines) -->
-        <div class="p-4 rounded-2xl bg-[#131f37] border border-slate-700/60">
+        <!-- Seguimiento: días desde el último pesaje (se recomienda uno por semana) -->
+        <a *ngIf="seguimiento" routerLink="/calculadora" (click)="isOpen = false"
+           class="block p-4 rounded-2xl bg-[#131f37] border border-slate-700/60 hover:border-slate-600 transition">
           <div class="flex items-center gap-3 mb-2">
-            <div class="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <div class="w-8 h-8 rounded-lg border flex items-center justify-center"
+                 [ngClass]="seguimiento.alDia ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400' : 'bg-amber-500/15 border-amber-500/30 text-amber-400'">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <circle cx="12" cy="12" r="10" stroke-width="2"/>
                 <circle cx="12" cy="12" r="6" stroke-width="2"/>
@@ -156,16 +198,16 @@ import { AuthService } from '../../core/auth/auth.service';
               </svg>
             </div>
             <div>
-              <p class="text-sm font-semibold text-white">Meta semanal</p>
-              <p class="text-xs text-slate-400">4 de 5 objetivos</p>
+              <p class="text-sm font-semibold text-white">Tu seguimiento</p>
+              <p class="text-xs text-slate-400">{{ seguimiento.texto }}</p>
             </div>
           </div>
-          <!-- Progress bar -->
           <div class="w-full bg-slate-900 rounded-full h-2 mb-2 overflow-hidden">
-            <div class="bg-emerald-500 h-2 rounded-full" style="width: 80%"></div>
+            <div class="h-2 rounded-full transition-all" [ngClass]="seguimiento.alDia ? 'bg-emerald-500' : 'bg-amber-500'"
+                 [style.width.%]="seguimiento.porcentaje"></div>
           </div>
-          <p class="text-[11px] text-slate-400 font-medium">¡Un último esfuerzo!</p>
-        </div>
+          <p class="text-[11px] font-medium" [ngClass]="seguimiento.alDia ? 'text-slate-400' : 'text-amber-400'">{{ seguimiento.consejo }}</p>
+        </a>
 
         <!-- User Row with Logout -->
         <div class="flex items-center justify-between pt-2 border-t border-slate-800/80">
@@ -193,8 +235,31 @@ import { AuthService } from '../../core/auth/auth.service';
     </aside>
   `
 })
-export class SidebarComponent {
+export class SidebarComponent implements OnInit {
   readonly authService = inject(AuthService);
+  private readonly progresoService = inject(ProgresoService);
   isOpen = false;
+  seguimiento: Seguimiento | null = null;
+
+  ngOnInit(): void {
+    this.progresoService.consultarHistorial().subscribe({
+      next: (historial) => this.seguimiento = calcularSeguimiento(historial[0]?.fecha ?? null),
+      error: () => this.seguimiento = null,
+    });
+  }
 }
 
+/** La barra se vacía a medida que pasan los días desde el último pesaje. */
+export function calcularSeguimiento(ultimaFecha: string | null, ahora: Date = new Date()): Seguimiento {
+  if (!ultimaFecha) {
+    return { texto: 'Aún no registras tu peso', consejo: 'Registra tu primer pesaje', porcentaje: 0, alDia: false };
+  }
+  const dias = diasDesde(ultimaFecha, ahora);
+  const alDia = dias < DIAS_POR_PESAJE;
+  return {
+    texto: `Último pesaje ${textoDias(dias)}`,
+    consejo: alDia ? '¡Vas al día con tu registro semanal!' : 'Toca registrar tu peso de esta semana',
+    porcentaje: alDia ? Math.round(((DIAS_POR_PESAJE - dias) / DIAS_POR_PESAJE) * 100) : 100,
+    alDia,
+  };
+}

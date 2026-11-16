@@ -1,191 +1,146 @@
-import { Injectable, inject } from '@angular/core';
-import { Router } from '@angular/router';
+import { Injectable } from '@angular/core';
 import Keycloak from 'keycloak-js';
 import { environment } from '../../../environments/environment';
 
-export interface UserSession {
-  name: string;
-  email: string;
-  role: string;
-}
-
+/**
+ * Sesión del usuario gestionada 100 % por Keycloak (Authorization Code + PKCE).
+ * El formulario de login lo pinta Keycloak con el tema "nutrigo", que replica
+ * el diseño de la app; aquí nunca se manejan contraseñas.
+ */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private readonly router = inject(Router);
-
   readonly keycloak = new Keycloak({
     url: environment.keycloak.url,
     realm: environment.keycloak.realm,
     clientId: environment.keycloak.clientId,
   });
 
-  private _initialized = false;
-  private _manualToken: string | null = null;
-  private _userSession: UserSession | null = null;
+  private _disponible = false;
+  private _inicializado = false;
 
-  constructor() {
-    this.restoreSession();
+  /** true si se pudo contactar con Keycloak al arrancar la app. */
+  get disponible(): boolean {
+    return this._disponible;
   }
 
-  private restoreSession(): void {
-    const storedToken = localStorage.getItem('access_token');
-    if (storedToken) {
-      this._manualToken = storedToken;
-      const storedUser = localStorage.getItem('user_info');
-      if (storedUser) {
-        try {
-          this._userSession = JSON.parse(storedUser);
-        } catch {
-          this._userSession = null;
-        }
-      }
-    }
-  }
-
-  /** Initialize Keycloak SSO check on bootstrap (without blocking app) */
+  /** Comprueba en silencio si ya hay sesión SSO abierta (no redirige). */
   async init(): Promise<boolean> {
-    if (this._initialized) return this.isAuthenticated;
+    if (this._inicializado) return this.isAuthenticated;
+    this._inicializado = true;
+    this.limpiarSesionAntigua();
 
     try {
-      const authenticated = await this.keycloak.init({
+      const autenticado = await this.keycloak.init({
         onLoad: 'check-sso',
         silentCheckSsoRedirectUri: `${window.location.origin}/silent-check-sso.html`,
         pkceMethod: 'S256',
         checkLoginIframe: false,
       });
-      this._initialized = true;
-      return authenticated || this.isAuthenticated;
-    } catch {
-      // In development or when Keycloak is offline, fallback gracefully
-      this._initialized = true;
-      return this.isAuthenticated;
+      this._disponible = true;
+      this.keycloak.onTokenExpired = () => {
+        this.keycloak.updateToken(30).catch(() => this.login(this.rutaActual()));
+      };
+      return autenticado;
+    } catch (err) {
+      console.error('No se pudo conectar con Keycloak', err);
+      this._disponible = false;
+      return false;
     }
   }
 
   get isAuthenticated(): boolean {
-    return Boolean(this.keycloak.authenticated || this._manualToken || localStorage.getItem('access_token'));
+    return Boolean(this.keycloak.authenticated);
   }
 
   get token(): string | undefined {
-    return this._manualToken || localStorage.getItem('access_token') || this.keycloak.token || undefined;
+    return this.keycloak.token;
   }
 
   get userName(): string {
-    if (this._userSession?.name) return this._userSession.name;
-    const nameFromKeycloak = this.keycloak.tokenParsed?.['name'] as string;
-    if (nameFromKeycloak) return nameFromKeycloak;
-    return 'Julian Villamizar';
+    const c = this.claims;
+    const nombreCompleto = [c['given_name'], c['family_name']].filter(Boolean).join(' ');
+    return (c['name'] as string) || nombreCompleto || (c['preferred_username'] as string) || this.userEmail || 'Usuario';
   }
 
   get userEmail(): string {
-    if (this._userSession?.email) return this._userSession.email;
-    const emailFromKeycloak = this.keycloak.tokenParsed?.['email'] as string;
-    if (emailFromKeycloak) return emailFromKeycloak;
-    return 'julian@nutrigo.com';
+    return (this.claims['email'] as string) || '';
   }
 
   get userInitials(): string {
-    const parts = this.userName.trim().split(/\s+/);
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[1][0]).toUpperCase();
-    }
-    return parts[0]?.substring(0, 2).toUpperCase() || 'US';
+    const partes = this.userName.trim().split(/\s+/);
+    if (partes.length >= 2) return (partes[0][0] + partes[1][0]).toUpperCase();
+    return partes[0]?.substring(0, 2).toUpperCase() || 'US';
   }
 
-  /**
-   * Log in with credentials (email & password).
-   * Requests a JWT token from Keycloak token endpoint or initializes session.
-   */
-  async login(email?: string, password?: string): Promise<boolean> {
-    if (email && password) {
-      try {
-        const tokenEndpoint = `${environment.keycloak.url}/realms/${environment.keycloak.realm}/protocol/openid-connect/token`;
-        const body = new URLSearchParams({
-          grant_type: 'password',
-          client_id: environment.keycloak.clientId,
-          username: email,
-          password: password,
-        });
+  get roles(): string[] {
+    const realmAccess = this.claims['realm_access'] as { roles?: string[] } | undefined;
+    return realmAccess?.roles ?? [];
+  }
 
-        const res = await fetch(tokenEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: body.toString(),
-        });
+  tieneRol(rol: string): boolean {
+    return this.roles.includes(rol);
+  }
 
-        if (res.ok) {
-          const data = await res.json();
-          this._manualToken = data.access_token;
-          localStorage.setItem('access_token', data.access_token);
+  get esAdmin(): boolean {
+    return this.tieneRol('ADMIN');
+  }
 
-          // Parse name from email or token
-          const extractedName = email.split('@')[0].replace(/[._]/g, ' ');
-          const formattedName = extractedName.charAt(0).toUpperCase() + extractedName.slice(1);
-          const session: UserSession = {
-            name: formattedName,
-            email: email,
-            role: 'USER',
-          };
-          this._userSession = session;
-          localStorage.setItem('user_info', JSON.stringify(session));
-          return true;
-        }
-      } catch (err) {
-        console.warn('Direct Keycloak login failed, using active local session token:', err);
-      }
+  /** NUTRITIONIST o ADMIN: pueden gestionar pacientes y sus planes. */
+  get esPersonalClinico(): boolean {
+    return this.tieneRol('NUTRITIONIST') || this.tieneRol('ADMIN');
+  }
 
-      // Fallback dev login token generation (keeps frontend fully functional during offline evaluations)
-      const mockPayload = {
-        sub: '12345678-1234-1234-1234-123456789abc',
-        email: email,
-        name: email.split('@')[0] || 'Julian Villamizar',
-        preferred_username: email,
-        realm_access: { roles: ['USER', 'NUTRITIONIST', 'ADMIN'] },
-      };
-      const dummyToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.' +
-        btoa(JSON.stringify(mockPayload)) + '.mock-signature';
-      
-      this._manualToken = dummyToken;
-      localStorage.setItem('access_token', dummyToken);
+  /** Id del usuario en Keycloak (claim "sub"). */
+  get keycloakUserId(): string {
+    return (this.claims['sub'] as string) || '';
+  }
 
-      const session: UserSession = {
-        name: mockPayload.name,
-        email: email,
-        role: 'USER',
-      };
-      this._userSession = session;
-      localStorage.setItem('user_info', JSON.stringify(session));
-      return true;
-    }
+  /** Etiqueta del rol más alto, para mostrar en la cabecera. */
+  get rolPrincipal(): string {
+    if (this.tieneRol('ADMIN')) return 'Administrador';
+    if (this.tieneRol('NUTRITIONIST')) return 'Nutricionista';
+    return 'Usuario';
+  }
 
-    // Default Keycloak browser redirect
-    this.keycloak.login({ redirectUri: `${window.location.origin}/dashboard` });
-    return true;
+  /** Redirige a la pantalla de login (tema NutriGO de Keycloak). */
+  login(rutaDestino = '/inicio'): Promise<void> {
+    return this.keycloak.login({ redirectUri: window.location.origin + rutaDestino });
+  }
+
+  /** Redirige directamente al formulario de registro de Keycloak. */
+  register(): Promise<void> {
+    return this.keycloak.register({ redirectUri: `${window.location.origin}/inicio` });
   }
 
   logout(): void {
-    this._manualToken = null;
-    this._userSession = null;
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('user_info');
-    try {
-      if (this.keycloak.authenticated) {
-        this.keycloak.logout({ redirectUri: `${window.location.origin}/login` });
-        return;
-      }
-    } catch {
-      // Ignored if keycloak is not initialized
-    }
-    this.router.navigate(['/login']);
+    this.keycloak.logout({ redirectUri: `${window.location.origin}/login` });
   }
 
+  /** Renueva el access token si le quedan menos de 30 s; si no se puede, pide login. */
   async refreshTokenIfNeeded(): Promise<void> {
-    if (this.keycloak.authenticated) {
-      try {
-        await this.keycloak.updateToken(30);
-      } catch {
-        // Token refresh silent fail
-      }
+    if (!this.keycloak.authenticated) return;
+    try {
+      await this.keycloak.updateToken(30);
+    } catch {
+      await this.login(this.rutaActual());
+    }
+  }
+
+  private get claims(): Record<string, unknown> {
+    return (this.keycloak.tokenParsed ?? {}) as Record<string, unknown>;
+  }
+
+  private rutaActual(): string {
+    return window.location.pathname + window.location.search;
+  }
+
+  /** La versión anterior guardaba un token (a veces falso) en localStorage. */
+  private limpiarSesionAntigua(): void {
+    try {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('user_info');
+    } catch {
+      // localStorage no disponible: nada que limpiar
     }
   }
 }

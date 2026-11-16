@@ -4,8 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { SidebarComponent } from '../../shared/sidebar/sidebar.component';
 import { HeaderComponent } from '../../shared/header/header.component';
 import { ProgresoService, ProgresoResponse } from '../../core/services/progreso.service';
-import { ImcService, IMC_META } from '../../core/services/imc.service';
-import { UsuarioService } from '../../core/services/usuario.service';
+import { infoImc } from '../../core/services/imc.service';
+import { mensajeDeError } from '../../core/http/mensaje-error';
 
 interface ProgresoFila {
   id: string;
@@ -61,6 +61,9 @@ interface ProgresoFila {
           <div *ngIf="mostrarFormulario" class="bg-white rounded-3xl p-6 border border-emerald-200 shadow-sm animate-fade-in">
             <h2 class="text-base font-bold text-slate-900 mb-1">Registrar nuevo pesaje</h2>
             <p class="text-xs text-slate-500 mb-4">Ingresa tu peso en kilogramos medido hoy.</p>
+            <div *ngIf="errorGuardar" class="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs max-w-md">
+              {{ errorGuardar }}
+            </div>
             
             <form (ngSubmit)="guardarPesaje()" class="flex flex-col sm:flex-row items-stretch sm:items-end gap-3 max-w-md">
               <div class="flex-1">
@@ -71,8 +74,8 @@ interface ProgresoFila {
                   name="nuevoPeso"
                   required
                   step="0.1"
-                  min="20"
-                  max="300"
+                  min="1"
+                  max="500"
                   placeholder="Ej. 69.5"
                   class="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 text-sm font-semibold outline-none transition"
                 />
@@ -86,12 +89,16 @@ interface ProgresoFila {
               </button>
               <button
                 type="button"
-                (click)="mostrarFormulario = false"
+                (click)="mostrarFormulario = false; errorGuardar = ''"
                 class="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold transition"
               >
                 Cancelar
               </button>
             </form>
+          </div>
+
+          <div *ngIf="errorCarga" class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-sm">
+            {{ errorCarga }}
           </div>
 
           <!-- Summary Metric Cards -->
@@ -101,7 +108,7 @@ interface ProgresoFila {
               <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Peso Actual</p>
               <div class="flex items-baseline gap-1.5">
                 <span class="text-2xl sm:text-3xl font-extrabold text-slate-900">
-                  {{ pesoActual ? (pesoActual | number:'1.1-1') : '70.0' }}
+                  {{ pesoActual !== null ? (pesoActual | number:'1.1-1') : '—' }}
                 </span>
                 <span class="text-xs text-slate-500 font-semibold">kg</span>
               </div>
@@ -112,7 +119,7 @@ interface ProgresoFila {
               <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Peso Inicial</p>
               <div class="flex items-baseline gap-1.5">
                 <span class="text-2xl sm:text-3xl font-extrabold text-slate-900">
-                  {{ pesoInicial ? (pesoInicial | number:'1.1-1') : '72.0' }}
+                  {{ pesoInicial !== null ? (pesoInicial | number:'1.1-1') : '—' }}
                 </span>
                 <span class="text-xs text-slate-500 font-semibold">kg</span>
               </div>
@@ -124,9 +131,10 @@ interface ProgresoFila {
               <div class="flex items-baseline gap-1.5">
                 <span
                   class="text-2xl sm:text-3xl font-extrabold"
-                  [ngClass]="cambioTotal < 0 ? 'text-emerald-600' : (cambioTotal > 0 ? 'text-rose-600' : 'text-slate-800')"
+                  [ngClass]="cambioTotal === null ? 'text-slate-800' : (cambioTotal < 0 ? 'text-emerald-600' : (cambioTotal > 0 ? 'text-rose-600' : 'text-slate-800'))"
                 >
-                  {{ cambioTotal > 0 ? '+' : '' }}{{ cambioTotal | number:'1.1-1' }}
+                  <ng-container *ngIf="cambioTotal !== null; else sinCambio">{{ cambioTotal > 0 ? '+' : '' }}{{ cambioTotal | number:'1.1-1' }}</ng-container>
+                  <ng-template #sinCambio>—</ng-template>
                 </span>
                 <span class="text-xs text-slate-500 font-semibold">kg</span>
               </div>
@@ -211,9 +219,9 @@ interface ProgresoFila {
                     </td>
                   </tr>
 
-                  <tr *ngIf="filas.length === 0">
+                  <tr *ngIf="filas.length === 0 && !cargando">
                     <td colspan="6" class="py-8 text-center text-slate-400 text-xs">
-                      No se encontraron registros de progreso aún.
+                      Aún no tienes pesajes registrados. Usa «Registrar Pesaje» para empezar.
                     </td>
                   </tr>
                 </tbody>
@@ -229,74 +237,60 @@ interface ProgresoFila {
 })
 export class ProgresoComponent implements OnInit {
   private readonly progresoService = inject(ProgresoService);
-  private readonly imcService = inject(ImcService);
-  private readonly usuarioService = inject(UsuarioService);
 
   filas: ProgresoFila[] = [];
-  estaturaCm = 177;
-  pesoActual: number = 70;
-  pesoInicial: number = 72;
-  cambioTotal: number = -2.0;
+  pesoActual: number | null = null;
+  pesoInicial: number | null = null;
+  cambioTotal: number | null = null;
+  cargando = true;
+  errorCarga = '';
 
   mostrarFormulario = false;
   nuevoPeso: number | null = null;
   guardando = false;
+  errorGuardar = '';
 
   ngOnInit(): void {
     this.cargarDatos();
   }
 
   cargarDatos(): void {
-    this.usuarioService.obtenerPerfil().subscribe({
-      next: (p) => {
-        if (p.estaturaCm) this.estaturaCm = p.estaturaCm;
-      }
-    });
-
+    this.cargando = true;
+    this.errorCarga = '';
     this.progresoService.consultarHistorial().subscribe({
       next: (data) => {
-        if (data && data.length > 0) {
-          this.procesarHistorial(data);
-        } else {
-          this.usarFallbackHistorial();
-        }
+        this.procesarHistorial(data ?? []);
+        this.cargando = false;
       },
-      error: () => {
-        this.usarFallbackHistorial();
-      }
+      error: (err) => {
+        this.procesarHistorial([]);
+        this.cargando = false;
+        this.errorCarga = mensajeDeError(err, 'No se pudo cargar tu historial de progreso.');
+      },
     });
   }
 
   guardarPesaje(): void {
-    if (!this.nuevoPeso || this.nuevoPeso <= 0) return;
+    const peso = Number(this.nuevoPeso);
+    if (!peso || peso < 1 || peso > 500) {
+      this.errorGuardar = 'El peso debe estar entre 1 y 500 kg.';
+      return;
+    }
 
     this.guardando = true;
-    this.progresoService.registrar({ pesoKg: this.nuevoPeso }).subscribe({
+    this.errorGuardar = '';
+    this.progresoService.registrar({ pesoKg: peso }).subscribe({
       next: () => {
         this.guardando = false;
         this.mostrarFormulario = false;
         this.nuevoPeso = null;
         this.cargarDatos();
       },
-      error: () => {
-        // Fallback local update
+      error: (err) => {
+        // p. ej. 409 si el perfil aún no tiene estatura
         this.guardando = false;
-        this.mostrarFormulario = false;
-        const imcCalc = this.imcService.calcularLocal(this.nuevoPeso!, this.estaturaCm);
-        const meta = IMC_META[imcCalc.categoria];
-        this.filas.unshift({
-          id: 'temp-' + Date.now(),
-          fecha: 'Hoy, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          pesoAnterior: this.filas[0]?.pesoActual || null,
-          pesoActual: this.nuevoPeso!,
-          cambioNeto: this.filas[0] ? parseFloat((this.nuevoPeso! - this.filas[0].pesoActual).toFixed(1)) : null,
-          imc: imcCalc.valor,
-          categoria: meta.label,
-          badgeClass: meta.badgeClass,
-        });
-        this.recalcularTotales();
-        this.nuevoPeso = null;
-      }
+        this.errorGuardar = mensajeDeError(err, 'No se pudo guardar el pesaje. Intenta de nuevo.');
+      },
     });
   }
 
@@ -304,8 +298,7 @@ export class ProgresoComponent implements OnInit {
     this.filas = data.map((item, index) => {
       const prev = data[index + 1];
       const cambio = prev ? parseFloat((item.pesoKg - prev.pesoKg).toFixed(1)) : null;
-      const cat = this.imcService.calcularLocal(item.pesoKg, this.estaturaCm).categoria;
-      const meta = IMC_META[cat] || IMC_META.PESO_NORMAL;
+      const info = infoImc(item.categoria);
 
       const dateObj = new Date(item.fecha);
       const isToday = new Date().toDateString() === dateObj.toDateString();
@@ -320,8 +313,8 @@ export class ProgresoComponent implements OnInit {
         pesoActual: item.pesoKg,
         cambioNeto: cambio,
         imc: item.imc,
-        categoria: meta.label,
-        badgeClass: meta.badgeClass,
+        categoria: info?.label ?? item.categoria,
+        badgeClass: info?.badgeClass ?? 'bg-slate-100 text-slate-600 border-slate-200',
       };
     });
 
@@ -329,57 +322,12 @@ export class ProgresoComponent implements OnInit {
   }
 
   private recalcularTotales(): void {
-    if (this.filas.length > 0) {
-      this.pesoActual = this.filas[0].pesoActual;
-      this.pesoInicial = this.filas[this.filas.length - 1].pesoActual;
-      this.cambioTotal = parseFloat((this.pesoActual - this.pesoInicial).toFixed(1));
+    if (this.filas.length === 0) {
+      this.pesoActual = this.pesoInicial = this.cambioTotal = null;
+      return;
     }
-  }
-
-  private usarFallbackHistorial(): void {
-    this.filas = [
-      {
-        id: '1',
-        fecha: 'Hoy, 08:30',
-        pesoAnterior: 70.8,
-        pesoActual: 70.0,
-        cambioNeto: -0.8,
-        imc: 22.3,
-        categoria: 'Normal',
-        badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      },
-      {
-        id: '2',
-        fecha: '12 May 2026',
-        pesoAnterior: 71.5,
-        pesoActual: 70.8,
-        cambioNeto: -0.7,
-        imc: 22.6,
-        categoria: 'Normal',
-        badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      },
-      {
-        id: '3',
-        fecha: '05 May 2026',
-        pesoAnterior: 72.0,
-        pesoActual: 71.5,
-        cambioNeto: -0.5,
-        imc: 22.8,
-        categoria: 'Normal',
-        badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      },
-      {
-        id: '4',
-        fecha: '28 Abr 2026',
-        pesoAnterior: null,
-        pesoActual: 72.0,
-        cambioNeto: null,
-        imc: 23.0,
-        categoria: 'Normal',
-        badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      },
-    ];
-    this.recalcularTotales();
+    this.pesoActual = this.filas[0].pesoActual;
+    this.pesoInicial = this.filas[this.filas.length - 1].pesoActual;
+    this.cambioTotal = parseFloat((this.pesoActual - this.pesoInicial).toFixed(1));
   }
 }
-
