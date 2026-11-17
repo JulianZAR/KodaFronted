@@ -1,10 +1,10 @@
-// Keycloak and API configuration for all environments
+﻿// Keycloak and API configuration for production
 export const environment = {
-  production: false,
-  apiUrl: 'http://localhost:8080',
+  production: true,
+  apiUrl: 'https://kodabackend.onrender.com',
   keycloak: {
-    url:      'http://localhost:8081',
-    realm:    'nutrigo',
+    url: 'https://nutrigo-keycloak.onrender.com',
+    realm: 'nutrigo',
     clientId: 'nutrigo-angular',
   },
 };
